@@ -74,12 +74,83 @@ def calculate_max_flow(
     )
 
     return flow_value, flow_dict
+def get_terminal_store_flows(flow_dict: dict) -> list[list]:
+    """
+    Розподіляє знайдений потік між терміналами та магазинами.
 
+    Повертає таблицю:
+    [термінал, магазин, фактичний потік].
+    """
+
+    terminals = ["Термінал 1", "Термінал 2"]
+    stores = [f"Магазин {number}" for number in range(1, 15)]
+
+    terminal_store_flow = {
+        (terminal, store): 0
+        for terminal in terminals
+        for store in stores
+    }
+
+    # Зберігаємо залишки потоків зі складів до магазинів.
+    remaining_warehouse_flows = {}
+
+    for warehouse in [f"Склад {number}" for number in range(1, 5)]:
+        for store, flow in flow_dict.get(warehouse, {}).items():
+            if store.startswith("Магазин"):
+                remaining_warehouse_flows[(warehouse, store)] = flow
+
+    # Розкладаємо загальний потік на маршрути:
+    # термінал -> склад -> магазин.
+    for terminal in terminals:
+        for warehouse, terminal_flow in flow_dict.get(terminal, {}).items():
+            remaining_terminal_flow = terminal_flow
+
+            for store in stores:
+                available_flow = remaining_warehouse_flows.get(
+                    (warehouse, store),
+                    0,
+                )
+
+                distributed_flow = min(
+                    remaining_terminal_flow,
+                    available_flow,
+                )
+
+                if distributed_flow > 0:
+                    terminal_store_flow[(terminal, store)] += distributed_flow
+                    remaining_terminal_flow -= distributed_flow
+                    remaining_warehouse_flows[
+                        (warehouse, store)
+                    ] -= distributed_flow
+
+                if remaining_terminal_flow == 0:
+                    break
+
+    return [
+        [terminal, store, terminal_store_flow[(terminal, store)]]
+        for terminal in terminals
+        for store in stores
+    ]
 
 if __name__ == "__main__":
     graph = build_graph()
     max_flow, flow_data = calculate_max_flow(graph)
 
+    flow_table = get_terminal_store_flows(flow_data)
+
     print(f"Кількість вершин: {graph.number_of_nodes()}")
     print(f"Кількість ребер: {graph.number_of_edges()}")
     print(f"Максимальний потік: {max_flow} одиниць")
+
+    print("\nПотоки від терміналів до магазинів:")
+    print(
+        tabulate(
+            flow_table,
+            headers=[
+                "Термінал",
+                "Магазин",
+                "Фактичний потік (одиниць)",
+            ],
+            tablefmt="grid",
+        )
+    )
